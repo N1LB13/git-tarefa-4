@@ -1,1 +1,66 @@
 
+# Nome do seu pipeline, que aparecerá na aba "Actions" do GitHub
+name: Deploy to GitHub Pages
+
+# Define o gatilho (trigger) para o pipeline
+on:
+  # Roda automaticamente sempre que um push for feito na branch 'main'
+  push:
+    branches: [ "main" ]
+  # Permite que você rode este pipeline manualmente pela interface do GitHub
+  workflow_dispatch:
+
+# Define as permissões necessárias para o pipeline publicar a página
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Define os jobs (tarefas) que o pipeline irá executar
+jobs:
+  # Primeiro job: verificar se o arquivo principal existe
+  test:
+    name: Verificar a existência do index.html
+    runs-on: ubuntu-latest # Rodará em uma máquina virtual Linux
+    steps:
+      # 1. Baixa o código do seu repositório para a máquina virtual
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      # 2. Executa o comando para verificar o arquivo
+      - name: Verificar se public/index.html existe
+        run: |
+          if [ ! -f public/index.html ]; then
+            echo "ERRO: O arquivo public/index.html não foi encontrado!"
+            exit 1 # Encerra o pipeline com status de falha
+          fi
+          echo "SUCESSO: O arquivo public/index.html foi encontrado."
+
+  # Segundo job: publicar o site (só roda se o job 'test' passar)
+  deploy:
+    name: Publicar no GitHub Pages
+    needs: test # Garante que este job só inicie após o sucesso do job 'test'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # 1. Baixa o código do seu repositório
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      # 2. Configura o GitHub Pages para a publicação
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      # 3. Faz o upload dos arquivos do site (artefato)
+      - name: Fazer upload do artefato
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Define que o conteúdo a ser publicado está na pasta 'public'
+          path: './public'
+
+      # 4. Realiza a publicação (deploy) do artefato no GitHub Pages
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
